@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Absensi Siswa</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Mengatur font default dan warna latar belakang pastel */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fdf6f6; /* Pastel Pinkish White */
+        }
+        /* Style kustom untuk placeholder */
+        ::placeholder {
+            color: #a0aec0;
+            opacity: 1;
+        }
+        /* Animasi fade-in untuk memuat elemen */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Style untuk tombol status yang aktif */
+        .status-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 2px white, 0 0 0 4px var(--tw-bg-opacity);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <!-- Header Aplikasi -->
+        <header class="text-center mb-8 fade-in">
+            <h1 class="text-4xl font-bold text-slate-700">Absensi Siswa</h1>
+            <p id="current-date" class="text-slate-500 mt-2">Memuat tanggal...</p>
+        </header>
+
+        <main>
+            <!-- Form untuk Menambah Siswa -->
+            <div class="bg-white p-6 rounded-xl shadow-lg mb-8 fade-in" style="animation-delay: 0.1s;">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-600">Tambah Siswa Baru</h2>
+                <form id="student-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="student-name" class="block text-sm font-medium text-gray-600 mb-1">Nama Siswa</label>
+                        <input type="text" id="student-name" placeholder="Contoh: Budi Santoso" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-300 focus:border-sky-300 transition" required>
+                    </div>
+                    <div>
+                        <label for="student-nis" class="block text-sm font-medium text-gray-600 mb-1">NIS</label>
+                        <input type="text" id="student-nis" placeholder="Contoh: 12345" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-300 focus:border-sky-300 transition" required>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-sky-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-500 transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-400">
+                            Tambah Siswa
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Bagian Daftar Siswa -->
+            <div class="bg-white p-6 rounded-xl shadow-lg fade-in" style="animation-delay: 0.2s;">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-slate-600">Daftar Kehadiran</h2>
+                    <input type="text" id="search-input" placeholder="Cari nama atau NIS..." class="w-full md:w-1/3 mt-3 md:mt-0 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-300 focus:border-sky-300 transition">
+                </div>
+                
+                <!-- Kontainer Tabel -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-fuchsia-100">
+                            <tr>
+                                <th class="p-4 font-semibold text-slate-600 rounded-l-lg">Nama Siswa</th>
+                                <th class="p-4 font-semibold text-slate-600">NIS</th>
+                                <th class="p-4 font-semibold text-slate-600 text-center">Status Kehadiran</th>
+                                <th class="p-4 font-semibold text-slate-600 text-center rounded-r-lg">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-list">
+                            <!-- Data siswa akan dimuat di sini oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                 <p id="empty-state" class="text-center text-slate-500 py-8 hidden">Belum ada siswa yang ditambahkan.</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Referensi elemen-elemen DOM
+            const studentForm = document.getElementById('student-form');
+            const studentList = document.getElementById('student-list');
+            const searchInput = document.getElementById('search-input');
+            const emptyState = document.getElementById('empty-state');
+            const currentDateEl = document.getElementById('current-date');
+
+            // Menampilkan tanggal hari ini
+            const today = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            currentDateEl.textContent = today.toLocaleDateString('id-ID', options);
+
+            // Inisialisasi data siswa dari localStorage
+            let students = JSON.parse(localStorage.getItem('school_attendance')) || [];
+
+            // Fungsi untuk menyimpan data ke localStorage
+            const saveStudents = () => {
+                localStorage.setItem('school_attendance', JSON.stringify(students));
+            };
+
+            // Fungsi untuk merender daftar siswa
+            const renderStudents = (filteredStudents = students) => {
+                studentList.innerHTML = '';
+                if (filteredStudents.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    filteredStudents.forEach(student => {
+                        const row = document.createElement('tr');
+                        row.className = 'border-b border-slate-200';
+
+                        // Tombol status
+                        const statuses = {
+                            Hadir: 'bg-emerald-300',
+                            Izin: 'bg-cyan-300',
+                            Sakit: 'bg-amber-300',
+                            Alpa: 'bg-slate-300',
+                        };
+                        
+                        let statusButtons = '';
+                        for (const status in statuses) {
+                            const isActive = student.status === status;
+                            const bgColor = statuses[status];
+                            statusButtons += `
+                                <button data-id="${student.id}" data-status="${status}" 
+                                        class="status-btn ${bgColor} text-white font-semibold py-1 px-3 rounded-full text-sm transition-transform ${isActive ? 'active' : ''}"
+                                        style="--tw-bg-opacity: ${isActive ? '1' : '0.6'};">
+                                    ${status}
+                                </button>
+                            `;
+                        }
+
+                        row.innerHTML = `
+                            <td class="p-4 font-medium">${student.name}</td>
+                            <td class="p-4 text-slate-500">${student.nis}</td>
+                            <td class="p-4 text-center space-x-2">
+                                ${statusButtons}
+                            </td>
+                            <td class="p-4 text-center">
+                                <button data-id="${student.id}" class="delete-btn text-rose-500 hover:text-rose-700 font-medium">
+                                    Hapus
+                                </button>
+                            </td>
+                        `;
+                        studentList.appendChild(row);
+                    });
+                }
+            };
+            
+            // Event listener untuk menambah siswa baru
+            studentForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const studentNameInput = document.getElementById('student-name');
+                const studentNisInput = document.getElementById('student-nis');
+
+                const newStudent = {
+                    id: Date.now().toString(),
+                    name: studentNameInput.value,
+                    nis: studentNisInput.value,
+                    status: 'Alpa' // Status default saat siswa baru ditambahkan
+                };
+
+                students.push(newStudent);
+                saveStudents();
+                renderStudents();
+                studentForm.reset();
+            });
+
+            // Event listener untuk tombol di dalam daftar siswa (Ubah Status dan Hapus)
+            studentList.addEventListener('click', (e) => {
+                const target = e.target;
+                const id = target.dataset.id;
+                if (!id) return;
+
+                if (target.classList.contains('status-btn')) {
+                    const newStatus = target.dataset.status;
+                    const studentIndex = students.findIndex(s => s.id === id);
+                    if (studentIndex > -1) {
+                        students[studentIndex].status = newStatus;
+                        saveStudents();
+                        renderStudents();
+                    }
+                }
+
+                if (target.classList.contains('delete-btn')) {
+                    // Konfirmasi sebelum menghapus
+                    if (confirm(`Apakah Anda yakin ingin menghapus siswa ini?`)) {
+                        students = students.filter(student => student.id !== id);
+                        saveStudents();
+                        renderStudents();
+                    }
+                }
+            });
+            
+            // Event listener untuk pencarian
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filtered = students.filter(student => 
+                    student.name.toLowerCase().includes(searchTerm) || 
+                    student.nis.toLowerCase().includes(searchTerm)
+                );
+                renderStudents(filtered);
+            });
+            
+            // Render data awal saat halaman dimuat
+            renderStudents();
+        });
+    </script>
+
+</body>
+</html>
